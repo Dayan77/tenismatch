@@ -36,6 +36,8 @@ function obterConfig(): { baseUrl: string; apiKey: string; instance: string } {
  * Remove sufixo @s.whatsapp.net se presente.
  */
 function normalizarTelefone(telefone: string): string {
+  // @lid é um identificador interno do WhatsApp — preserva completo para envio
+  if (telefone.includes('@lid')) return telefone;
   const semSufixo = telefone.split('@')[0] ?? telefone;
   const digitos   = semSufixo.replace(/\D/g, '');
   if (digitos.startsWith('55') && digitos.length >= 12) return digitos;
