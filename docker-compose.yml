@@ -1,0 +1,42 @@
+services:
+
+  # ── Banco de dados ──────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tennismatch-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       tennismatch
+      POSTGRES_USER:     tennismatch
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tennismatch"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Aplicação ───────────────────────────────────────────────
+  app:
+    build: .
+    container_name: tennismatch-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL:       postgres://tennismatch:${POSTGRES_PASSWORD}@postgres:5432/tennismatch
+      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY}
+      ZAPI_INSTANCE_ID:   ${ZAPI_INSTANCE_ID}
+      ZAPI_TOKEN:         ${ZAPI_TOKEN}
+      ZAPI_CLIENT_TOKEN:  ${ZAPI_CLIENT_TOKEN}
+      PUBLIC_URL:         ${PUBLIC_URL}
+      PORT:               3000
+      TZ:                 America/Sao_Paulo
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
