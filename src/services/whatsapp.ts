@@ -208,10 +208,22 @@ export async function resolverJogadorPorTelefone(
 ): Promise<{ id: string; nome: string; telefone: string } | null> {
   const numero = normalizarTelefone(telefone);
   const { rows } = await query<{ id: string; nome: string; telefone: string }>(
-    `SELECT id, nome, telefone FROM jogadores WHERE telefone = $1 AND ativo = TRUE`,
+    `SELECT id, nome, telefone FROM jogadores
+      WHERE (telefone = $1 OR jid = $1) AND ativo = TRUE`,
     [numero]
   );
   return rows[0] ?? null;
+}
+
+/**
+ * Armazena o JID (@lid ou @s.whatsapp.net) associado ao jogador,
+ * para que mensagens futuras desse JID sejam roteadas corretamente.
+ */
+export async function salvarJidJogador(jogadorId: string, jid: string): Promise<void> {
+  await query(
+    `UPDATE jogadores SET jid = $1 WHERE id = $2 AND (jid IS NULL OR jid != $1)`,
+    [jid, jogadorId]
+  );
 }
 
 // ── Notificações de resultado ────────────────────────────────

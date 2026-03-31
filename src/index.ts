@@ -20,6 +20,7 @@ import { agendarPartida } from './services/agendador.js';
 import {
   parsearWebhookEvolution,
   resolverJogadorPorTelefone,
+  salvarJidJogador,
   enviarMensagem,
 } from './services/whatsapp.js';
 
@@ -113,6 +114,8 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
     // Garante que só seta jogador_id se for um UUID real
     if (jogador && !contexto.jogador_id) {
       contexto.jogador_id = jogador.id;
+      // Salva o JID (@lid ou @s.whatsapp.net) para futuras mensagens
+      if (de.includes('@')) await salvarJidJogador(jogador.id, de);
     } else if (!jogador) {
       // Novo usuário: garante que jogador_id não existe no contexto
       delete contexto.jogador_id;
