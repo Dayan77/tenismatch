@@ -121,7 +121,30 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
       delete contexto.jogador_id;
     }
     if (!jogador && !contexto.telefone) {
-      contexto.telefone = de;
+      // ── Atalho @lid: detecta telefone enviado na mensagem ────
+      if (de.includes('@lid')) {
+        const match = corpo.replace(/\D/g, '').match(/^(?:55)?(\d{10,11})$/);
+        if (match) {
+          const telefoneExtraido = match[0].startsWith('55') ? match[0] : `55${match[0]}`;
+          // Registra o mapeamento @lid → telefone real no banco
+          await query(
+            `UPDATE jogadores SET jid = $1 WHERE telefone = $2`,
+            [de, telefoneExtraido]
+          );
+          // Busca jogador recém vinculado
+          const jogadorVinculado = await resolverJogadorPorTelefone(telefoneExtraido);
+          if (jogadorVinculado) {
+            contexto.jogador_id = jogadorVinculado.id;
+            await salvarJidJogador(jogadorVinculado.id, de);
+            console.log(`[Webhook] @lid vinculado ao jogador ${jogadorVinculado.nome} via telefone`);
+          }
+          contexto.telefone = telefoneExtraido;
+        } else {
+          contexto.telefone = de;
+        }
+      } else {
+        contexto.telefone = de;
+      }
     }
     console.log(`[Webhook] Contexto: jogador_id=${contexto.jogador_id ?? 'undefined'}, telefone=${contexto.telefone ?? 'undefined'}`);
 
@@ -208,7 +231,10 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
     const partes = resposta.split(/\n---\n/).filter(p => p.trim().length > 0);
     console.log(`[Webhook] Resposta gerada (${resposta.length} chars, ${partes.length} parte(s))`);
     // Se @lid e jogador registrado, usa o telefone do banco para enviar
-    const destinatario = (de.includes('@lid') && jogador?.telefone) ? jogador.telefone : de;
+    const telefoneContexto = contexto.telefone && !contexto.telefone.includes('@lid') ? contexto.telefone : undefined;
+    const destinatario = (de.includes('@lid'))
+      ? (jogador?.telefone ?? telefoneContexto ?? de)
+      : de;
     await enviarResposta(destinatario, resposta);
     console.log('[Webhook] Mensagem(ns) enviada(s) via Evolution API');
   } catch (err) {
