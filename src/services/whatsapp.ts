@@ -60,7 +60,7 @@ export async function enviarMensagem(
         'Content-Type': 'application/json',
         'apikey':       apiKey,
       },
-      body: JSON.stringify({ number, textMessage: { text: mensagem } }),
+      body: JSON.stringify({ number, text: mensagem }),
     });
 
     if (!res.ok) {
