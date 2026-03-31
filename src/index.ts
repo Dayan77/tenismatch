@@ -19,7 +19,6 @@ import { registrarResultado } from './services/coeficiente.js';
 import { agendarPartida } from './services/agendador.js';
 import {
   parsearWebhookEvolution,
-  validarWebhookEvolution,
   resolverJogadorPorTelefone,
   enviarMensagem,
 } from './services/whatsapp.js';
@@ -89,14 +88,7 @@ function encadearProcessamento(chave: string, fn: () => Promise<void>): void {
 // ── Webhook WhatsApp ─────────────────────────────────────────
 
 app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
-  // Valida API key da Evolution API (header "apikey" ou campo no body)
   const bodyRaw = req.body as Record<string, unknown>;
-  const apikeyHeader = req.headers['apikey'] as string | undefined;
-  const apikeyBody   = bodyRaw['apikey'] as string | undefined;
-  if (!validarWebhookEvolution(apikeyHeader, apikeyBody)) {
-    res.sendStatus(403);
-    return;
-  }
 
   // Evolution API espera status 200 imediatamente
   res.sendStatus(200);
