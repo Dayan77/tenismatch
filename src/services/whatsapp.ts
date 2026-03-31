@@ -205,10 +205,10 @@ export function validarWebhookEvolution(
  */
 export async function resolverJogadorPorTelefone(
   telefone: string
-): Promise<{ id: string; nome: string } | null> {
+): Promise<{ id: string; nome: string; telefone: string } | null> {
   const numero = normalizarTelefone(telefone);
-  const { rows } = await query<{ id: string; nome: string }>(
-    `SELECT id, nome FROM jogadores WHERE telefone = $1 AND ativo = TRUE`,
+  const { rows } = await query<{ id: string; nome: string; telefone: string }>(
+    `SELECT id, nome, telefone FROM jogadores WHERE telefone = $1 AND ativo = TRUE`,
     [numero]
   );
   return rows[0] ?? null;

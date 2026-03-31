@@ -204,7 +204,9 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
     const resposta = await processarMensagem(corpo, contexto);
     const partes = resposta.split(/\n---\n/).filter(p => p.trim().length > 0);
     console.log(`[Webhook] Resposta gerada (${resposta.length} chars, ${partes.length} parte(s))`);
-    await enviarResposta(de, resposta);
+    // Se @lid e jogador registrado, usa o telefone do banco para enviar
+    const destinatario = (de.includes('@lid') && jogador?.telefone) ? jogador.telefone : de;
+    await enviarResposta(destinatario, resposta);
     console.log('[Webhook] Mensagem(ns) enviada(s) via Evolution API');
   } catch (err) {
     console.error('[Webhook] Erro:', err);
