@@ -122,34 +122,33 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
     }
     // ── Atalho @lid: quando o remetente usa JID privado ─────────
     if (!jogador && de.includes('@lid')) {
-      // Verifica se a mensagem contém um número de telefone brasileiro
       const soDigitos = corpo.replace(/\D/g, '');
       const match = soDigitos.match(/^(?:55)?(\d{10,11})$/);
       if (match) {
         const telefoneExtraido = soDigitos.startsWith('55') ? soDigitos : `55${soDigitos}`;
         console.log(`[Webhook] @lid enviou telefone: ${telefoneExtraido}`);
-        // Vincula o JID ao jogador pelo telefone
-        await query(`UPDATE jogadores SET jid = $1 WHERE telefone = $2`, [de, telefoneExtraido]);
         const jogadorVinculado = await resolverJogadorPorTelefone(telefoneExtraido);
         if (jogadorVinculado) {
-          contexto.jogador_id = jogadorVinculado.id;
+          // Jogador já existe → vincula JID e confirma
+          await query(`UPDATE jogadores SET jid = $1 WHERE telefone = $2`, [de, telefoneExtraido]);
           await salvarJidJogador(jogadorVinculado.id, de);
+          contexto.jogador_id = jogadorVinculado.id;
           console.log(`[Webhook] @lid vinculado ao jogador ${jogadorVinculado.nome}`);
           await enviarMensagem(
             telefoneExtraido,
             `✅ Pronto, *${jogadorVinculado.nome}*! Seu número foi vinculado. Pode usar o bot normalmente agora! 🎾`
           );
-        } else {
-          await enviarMensagem(
-            telefoneExtraido,
-            `Não encontrei nenhum jogador com o número ${telefoneExtraido}. Verifique o número ou entre em contato com o administrador.`
-          );
+          return;
         }
-        return; // não passa ao agente — vínculo já foi tratado
+        // Novo usuário: define telefone real e cai no fluxo de cadastro
+        contexto.telefone = telefoneExtraido;
+        console.log(`[Webhook] @lid novo usuário com telefone ${telefoneExtraido} — iniciando cadastro`);
+        // Não retorna — passa ao agente para iniciar onboarding
+      } else {
+        // Sem telefone na mensagem: não conseguimos responder ao @lid
+        console.log(`[Webhook] @lid sem cadastro e sem telefone na mensagem — ignorando`);
+        return;
       }
-      // Telefone não foi enviado: não conseguimos responder ao @lid, apenas logamos
-      console.log(`[Webhook] @lid sem cadastro e sem telefone na mensagem — ignorando resposta`);
-      return;
     }
 
     if (!contexto.telefone) {
@@ -246,6 +245,12 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
       : de;
     await enviarResposta(destinatario, resposta);
     console.log('[Webhook] Mensagem(ns) enviada(s) via Evolution API');
+
+    // Se @lid e cadastro acabou de acontecer durante esta requisição, salva o JID
+    if (de.includes('@lid') && contexto.jogador_id) {
+      const telfReal = contexto.telefone && !contexto.telefone.includes('@lid') ? contexto.telefone : null;
+      if (telfReal) await salvarJidJogador(contexto.jogador_id, de);
+    }
   } catch (err) {
     console.error('[Webhook] Erro:', err);
   }
