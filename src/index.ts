@@ -120,31 +120,40 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
       // Novo usuário: garante que jogador_id não existe no contexto
       delete contexto.jogador_id;
     }
-    if (!jogador && !contexto.telefone) {
-      // ── Atalho @lid: detecta telefone enviado na mensagem ────
-      if (de.includes('@lid')) {
-        const match = corpo.replace(/\D/g, '').match(/^(?:55)?(\d{10,11})$/);
-        if (match) {
-          const telefoneExtraido = match[0].startsWith('55') ? match[0] : `55${match[0]}`;
-          // Registra o mapeamento @lid → telefone real no banco
-          await query(
-            `UPDATE jogadores SET jid = $1 WHERE telefone = $2`,
-            [de, telefoneExtraido]
+    // ── Atalho @lid: quando o remetente usa JID privado ─────────
+    if (!jogador && de.includes('@lid')) {
+      // Verifica se a mensagem contém um número de telefone brasileiro
+      const soDigitos = corpo.replace(/\D/g, '');
+      const match = soDigitos.match(/^(?:55)?(\d{10,11})$/);
+      if (match) {
+        const telefoneExtraido = soDigitos.startsWith('55') ? soDigitos : `55${soDigitos}`;
+        console.log(`[Webhook] @lid enviou telefone: ${telefoneExtraido}`);
+        // Vincula o JID ao jogador pelo telefone
+        await query(`UPDATE jogadores SET jid = $1 WHERE telefone = $2`, [de, telefoneExtraido]);
+        const jogadorVinculado = await resolverJogadorPorTelefone(telefoneExtraido);
+        if (jogadorVinculado) {
+          contexto.jogador_id = jogadorVinculado.id;
+          await salvarJidJogador(jogadorVinculado.id, de);
+          console.log(`[Webhook] @lid vinculado ao jogador ${jogadorVinculado.nome}`);
+          await enviarMensagem(
+            telefoneExtraido,
+            `✅ Pronto, *${jogadorVinculado.nome}*! Seu número foi vinculado. Pode usar o bot normalmente agora! 🎾`
           );
-          // Busca jogador recém vinculado
-          const jogadorVinculado = await resolverJogadorPorTelefone(telefoneExtraido);
-          if (jogadorVinculado) {
-            contexto.jogador_id = jogadorVinculado.id;
-            await salvarJidJogador(jogadorVinculado.id, de);
-            console.log(`[Webhook] @lid vinculado ao jogador ${jogadorVinculado.nome} via telefone`);
-          }
-          contexto.telefone = telefoneExtraido;
         } else {
-          contexto.telefone = de;
+          await enviarMensagem(
+            telefoneExtraido,
+            `Não encontrei nenhum jogador com o número ${telefoneExtraido}. Verifique o número ou entre em contato com o administrador.`
+          );
         }
-      } else {
-        contexto.telefone = de;
+        return; // não passa ao agente — vínculo já foi tratado
       }
+      // Telefone não foi enviado: não conseguimos responder ao @lid, apenas logamos
+      console.log(`[Webhook] @lid sem cadastro e sem telefone na mensagem — ignorando resposta`);
+      return;
+    }
+
+    if (!contexto.telefone) {
+      contexto.telefone = de;
     }
     console.log(`[Webhook] Contexto: jogador_id=${contexto.jogador_id ?? 'undefined'}, telefone=${contexto.telefone ?? 'undefined'}`);
 
