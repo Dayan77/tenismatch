@@ -1,0 +1,39 @@
+name: Deploy → Easypanel
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Easypanel deploy
+        run: |
+          curl -s -X POST "${{ secrets.EASYPANEL_DEPLOY_WEBHOOK }}" \
+            -o /tmp/deploy_response.txt -w "\nHTTP %{http_code}\n"
+          cat /tmp/deploy_response.txt
+
+      - name: Aguarda app reiniciar
+        run: |
+          echo "Aguardando deploy..."
+          sleep 20
+          for i in $(seq 1 15); do
+            status=$(curl -s --max-time 5 "${{ secrets.APP_URL }}/health" | grep -c '"status":"ok"' || echo 0)
+            if [[ "$status" == "1" ]]; then
+              echo "✅ App online após ${i}x10s"
+              exit 0
+            fi
+            echo "  [${i}/15] Aguardando..."
+            sleep 10
+          done
+          echo "❌ App não respondeu após 2.5 minutos"
+          exit 1
+
+      - name: Roda testes automatizados
+        run: |
+          chmod +x test.sh
+          bash test.sh --no-fix
+        working-directory: ${{ github.workspace }}
+        env:
+          EVOLUTION_API_KEY: ${{ secrets.EVOLUTION_API_KEY }}
