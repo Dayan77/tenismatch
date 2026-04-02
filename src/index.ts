@@ -19,6 +19,7 @@ import { registrarResultado } from './services/coeficiente.js';
 import { agendarPartida } from './services/agendador.js';
 import {
   parsearWebhookEvolution,
+  validarWebhookEvolution,
   resolverJogadorPorTelefone,
   salvarJidJogador,
   enviarMensagem,
@@ -91,6 +92,14 @@ function encadearProcessamento(chave: string, fn: () => Promise<void>): void {
 app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
   const bodyRaw = req.body as Record<string, unknown>;
 
+  // Valida apikey (header ou body)
+  const apikeyHeader = req.headers['apikey'] as string | undefined;
+  const bodyApikey   = (bodyRaw as Record<string, unknown>)?.['apikey'] as string | undefined;
+  if (!validarWebhookEvolution(apikeyHeader, bodyApikey)) {
+    res.sendStatus(403);
+    return;
+  }
+
   // Evolution API espera status 200 imediatamente
   res.sendStatus(200);
 
@@ -145,9 +154,9 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
         console.log(`[Webhook] @lid novo usuário com telefone ${telefoneExtraido} — iniciando cadastro`);
         // Não retorna — passa ao agente para iniciar onboarding
       } else {
-        // Sem telefone na mensagem: não conseguimos responder ao @lid
-        console.log(`[Webhook] @lid sem cadastro e sem telefone na mensagem — ignorando`);
-        return;
+        // Sem telefone na mensagem: responde ao @lid e inicia onboarding
+        console.log(`[Webhook] @lid sem cadastro e sem telefone na mensagem — iniciando onboarding pelo @lid`);
+        // Não retorna — passa ao agente para solicitar o número de telefone
       }
     }
 
@@ -306,7 +315,6 @@ app.post('/api/agente/chat', async (req: Request, res: Response, next: NextFunct
 // ── Reset de contexto (uso em testes) ───────────────────────
 
 app.post('/api/debug/reset-contexto', (req: Request, res: Response) => {
-  // Só funciona se o token de teste correto for passado
   const token = req.query['token'] as string | undefined;
   if (token !== process.env.EVOLUTION_API_KEY) {
     res.sendStatus(403);
@@ -316,6 +324,22 @@ app.post('/api/debug/reset-contexto', (req: Request, res: Response) => {
   if (!chave) { res.status(400).json({ erro: 'Campo obrigatório: chave' }); return; }
   limparContexto(chave);
   res.json({ ok: true, chave });
+});
+
+// ── Query direta ao banco (uso em testes) ────────────────────
+
+app.post('/api/debug/query', async (req: Request, res: Response, next: NextFunction) => {
+  const token = req.query['token'] as string | undefined;
+  if (token !== process.env.EVOLUTION_API_KEY) {
+    res.sendStatus(403);
+    return;
+  }
+  try {
+    const { sql, params } = req.body as { sql?: string; params?: unknown[] };
+    if (!sql) { res.status(400).json({ erro: 'Campo obrigatório: sql' }); return; }
+    const result = await query(sql, params);
+    res.json({ rows: result.rows, rowCount: result.rowCount });
+  } catch (err) { next(err); }
 });
 
 // ── Ranking ──────────────────────────────────────────────────
