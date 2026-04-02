@@ -92,14 +92,6 @@ function encadearProcessamento(chave: string, fn: () => Promise<void>): void {
 app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
   const bodyRaw = req.body as Record<string, unknown>;
 
-  // Valida apikey (header ou body)
-  const apikeyHeader = req.headers['apikey'] as string | undefined;
-  const bodyApikey   = (bodyRaw as Record<string, unknown>)?.['apikey'] as string | undefined;
-  if (!validarWebhookEvolution(apikeyHeader, bodyApikey)) {
-    res.sendStatus(403);
-    return;
-  }
-
   // Evolution API espera status 200 imediatamente
   res.sendStatus(200);
 

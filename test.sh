@@ -203,13 +203,13 @@ t01_health() {
   assert "Banco conectado" "$(echo "$h" | grep -c '"banco":"conectado"')" "1"
 }
 
-# ── T02: Token inválido → 403 ─────────────────────────────────────────────────
+# ── T02: Token inválido → 403 (endpoint de debug, não webhook) ────────────────
 t02_token_invalido() {
   section "T02 — Segurança: Token Inválido → 403"
-  local code; code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$WEBHOOK_BAD" \
+  local code; code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    "$BASE_URL/api/debug/query?token=CHAVE_INVALIDA_XPTO" \
     -H "Content-Type: application/json" \
-    -H "apikey: CHAVE_INVALIDA_XPTO" \
-    -d '{"event":"messages.upsert","apikey":"CHAVE_INVALIDA_XPTO","data":{"key":{"remoteJid":"5500000000001@s.whatsapp.net","fromMe":false},"message":{"conversation":"oi"},"messageType":"conversation"}}')
+    -d '{"sql":"SELECT 1"}')
   assert "Token inválido → 403" "$code" "403"
 }
 
