@@ -615,18 +615,25 @@ async function executarFerramenta(
         const conviteId  = String(input.convite_id);
         const jogadorId  = String(input.jogador_id);
 
-        const partida = await aceitarConvite(conviteId, jogadorId);
+        const resultado = await aceitarConvite(conviteId, jogadorId);
 
         // Limpa convite do contexto independente do resultado
         delete contexto.convite_pendente;
 
-        if (!partida) {
+        if (!resultado.ok) {
+          if (resultado.motivo === 'sem_quadra') {
+            return JSON.stringify({
+              sucesso: false,
+              mensagem: 'Boa vontade não faltou! Infelizmente não há quadra disponível nesse horário. O organizador será avisado para tentar outro horário. 🎾',
+            });
+          }
           return JSON.stringify({
             sucesso: false,
             mensagem: 'Eita — outro jogador acabou de fechar essa vaga antes de você! Mas fica ligado, pode aparecer outro convite. 🎾',
           });
         }
 
+        const { partida } = resultado;
         const dataHoraStr = new Date(partida.data_hora).toLocaleString('pt-BR', {
           dateStyle: 'short', timeStyle: 'short', timeZone: process.env.TZ ?? 'America/Sao_Paulo',
         });

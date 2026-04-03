@@ -172,9 +172,9 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
 
         if (aceitou) {
           console.log(`[Webhook] ${jogador.nome} aceitou convite ${convite.id}`);
-          const partida = await aceitarConvite(convite.id, jogador.id);
-          if (partida) {
-            const dataStr = new Date(partida.data_hora).toLocaleString('pt-BR', {
+          const resultado = await aceitarConvite(convite.id, jogador.id);
+          if (resultado.ok) {
+            const dataStr = new Date(resultado.partida.data_hora).toLocaleString('pt-BR', {
               dateStyle: 'short', timeStyle: 'short', timeZone: process.env.TZ ?? 'America/Sao_Paulo',
             });
             // Notifica o convidado
@@ -190,6 +190,23 @@ app.post('/webhook/whatsapp', async (req: Request, res: Response) => {
               await enviarMensagem(solRows[0].telefone,
                 `🎾 Boa notícia! *${jogador.nome}* topou o desafio!\n\n` +
                 `Vocês se encontram em *${dataStr}*. Aquece bem e vai com tudo! 💪`
+              );
+            }
+          } else if (resultado.motivo === 'sem_quadra') {
+            console.log(`[Webhook] ${jogador.nome} aceitou convite ${convite.id} mas sem quadra disponível`);
+            await enviarMensagem(de,
+              `Boa vontade não faltou, *${jogador.nome}*! 🙏\n\n` +
+              `Infelizmente não encontramos uma quadra disponível nesse horário. ` +
+              `O organizador será avisado para tentar outro horário. 🎾`
+            );
+            // Notifica o solicitante para que remarque
+            const { rows: solRows } = await query<{ telefone: string; nome: string }>(
+              `SELECT telefone, nome FROM jogadores WHERE id = $1`, [convite.solicitante_id]
+            );
+            if (solRows[0]) {
+              await enviarMensagem(solRows[0].telefone,
+                `⚠️ *${jogador.nome}* topou jogar, mas não há quadra disponível no horário solicitado.\n\n` +
+                `Tente marcar para outro horário. 🎾`
               );
             }
           } else {

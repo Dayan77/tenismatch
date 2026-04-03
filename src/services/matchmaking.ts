@@ -455,14 +455,17 @@ export async function verificarConvitePendente(
   return rows[0] ?? null;
 }
 
+export type ResultadoAceite =
+  | { ok: true; partida: Partida }
+  | { ok: false; motivo: 'ja_preenchido' | 'sem_quadra' };
+
 /**
  * Aceita um convite: cria a partida e atualiza ambas as solicitações.
- * Retorna a partida criada ou null se a solicitação já foi preenchida.
  */
 export async function aceitarConvite(
   conviteId: string,
   convidadoId: string
-): Promise<Partida | null> {
+): Promise<ResultadoAceite> {
   // Busca o convite com dados da solicitação
   const { rows: convRows } = await query<{
     solicitacao_id: string; solicitante_id: string; data_preferida: Date | null; horario_preferido: string | null;
@@ -474,12 +477,12 @@ export async function aceitarConvite(
     [conviteId]
   );
   const conv = convRows[0];
-  if (!conv) return null; // solicitação já foi preenchida ou convite inválido
+  if (!conv) return { ok: false, motivo: 'ja_preenchido' };
 
   // Resolve data+hora ANTES de buscar quadra (precisa do timestamp completo para overlap check)
   const dataHora = resolverDataHoraConvite(conv.data_preferida, conv.horario_preferido);
   const quadra = await encontrarQuradraDisponivel(dataHora);
-  if (!quadra) return null;
+  if (!quadra) return { ok: false, motivo: 'sem_quadra' };
 
   return withTransaction(async (client) => {
     // Cria a partida
@@ -508,7 +511,7 @@ export async function aceitarConvite(
       [conv.solicitacao_id, conviteId]
     );
 
-    return partida;
+    return { ok: true, partida };
   });
 }
 
