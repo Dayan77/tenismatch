@@ -782,6 +782,22 @@ run_all() {
   t19_conteudo_convite
 }
 
+teardown() {
+  section "TEARDOWN — Limpando dados de teste"
+  db "DELETE FROM convites_match WHERE
+        solicitante_id IN (SELECT id FROM jogadores WHERE telefone LIKE '550000000000%')
+     OR convidado_id  IN (SELECT id FROM jogadores WHERE telefone LIKE '550000000000%');" > /dev/null 2>&1 || true
+  db "DELETE FROM solicitacoes_match WHERE jogador_id IN
+        (SELECT id FROM jogadores WHERE telefone LIKE '550000000000%');" > /dev/null 2>&1 || true
+  db "DELETE FROM partidas WHERE
+        jogador1_id IN (SELECT id FROM jogadores WHERE telefone LIKE '550000000000%')
+     OR jogador2_id IN (SELECT id FROM jogadores WHERE telefone LIKE '550000000000%');" > /dev/null 2>&1 || true
+  db "DELETE FROM jogadores WHERE telefone LIKE '550000000000%';" > /dev/null 2>&1 || true
+  db "DELETE FROM quadra_horarios WHERE quadra_id IN (SELECT id FROM quadras WHERE nome='Quadra Teste');" > /dev/null 2>&1 || true
+  db "DELETE FROM quadras WHERE nome='Quadra Teste';" > /dev/null 2>&1 || true
+  info "Dados de teste removidos."
+}
+
 print_report() {
   local cycle=$1
   echo ""
@@ -823,6 +839,7 @@ while [[ $NEEDS_NEXT_CYCLE == true && $CYCLE -lt $MAX_CYCLES ]]; do
   print_report "$CYCLE"
 
   if [[ $TESTS_FAIL -eq 0 ]]; then
+    teardown
     echo -e "\n${BOLD}${GREEN}🎾  TODOS OS TESTES PASSARAM! Sistema 100% funcional.${NC}\n"
     exit 0
   fi
@@ -849,6 +866,7 @@ while [[ $NEEDS_NEXT_CYCLE == true && $CYCLE -lt $MAX_CYCLES ]]; do
   fi
 done
 
+teardown
 echo -e "${RED}${BOLD}⛔ $TESTS_FAIL falha(s) persistente(s) após $CYCLE ciclo(s).${NC}"
 echo -e "${YELLOW}Intervenção manual necessária nas falhas listadas acima.${NC}\n"
 exit 1
